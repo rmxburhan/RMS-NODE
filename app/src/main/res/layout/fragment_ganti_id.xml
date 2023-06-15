@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp"
+    tools:context=".ui.GantiIdFragment">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:text="Masukkan id perangkat"
+        android:textColor="@color/black"
+        android:textSize="13sp"
+        android:textAlignment="center"/>
+
+    <EditText
+        android:id="@+id/edtIdPerangkat"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_btn_silcer"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="12dp"
+        android:textSize="13sp"
+        android:layout_marginTop="8dp"/>
+
+    <Button
+        android:id="@+id/btnSimpanId"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Save"
+        android:background="@drawable/bg_btn"
+        android:textSize="12sp"
+        android:layout_marginTop="8dp"
+        />
+
+</LinearLayout>
