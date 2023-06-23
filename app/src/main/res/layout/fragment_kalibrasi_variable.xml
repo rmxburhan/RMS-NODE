@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    tools:context=".ui.KalibrasiVariableFragment"
+    android:orientation="vertical"
+    android:padding="32dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Masukkan konstanta kalibrasi (meter)"
+        android:textColor="@color/black"/>
+
+    <EditText
+        android:id="@+id/edtKonstantaKalibrasiJarakGo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp"
+        android:hint="Jarak go"
+        />
+
+    <EditText
+        android:id="@+id/edtKonstantaKalibrasi"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp"
+        android:hint="Jarak"
+        />
+
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/btnSimpan"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Simpan"
+        android:textStyle="bold"
+        android:textSize="12sp"
+        android:textColor="@color/white"
+        android:background="@drawable/bg_btn"
+        />
+
+
+
+</LinearLayout>

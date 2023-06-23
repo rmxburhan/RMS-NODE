@@ -8,6 +8,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.hardware.usb.UsbManager
 import android.location.GnssStatus
@@ -19,6 +20,7 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.provider.Settings
 import android.widget.ArrayAdapter
 import android.widget.TextView
 import android.widget.Toast
@@ -33,6 +35,7 @@ import com.example.myapplication.models.SerialItem
 import com.example.myapplication.models.constanst.Constants
 import com.example.myapplication.serial.CustomProber
 import com.example.myapplication.ui.GantiIdFragment
+import com.example.myapplication.ui.KalibrasiVariableFragment
 import com.example.myapplication.ui.SetTimerDialog
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
@@ -87,7 +90,7 @@ class MainActivity : AppCompatActivity(), SerialInputOutputManager.Listener, Gan
     private var delay  : Long = 1000
 
     private var ioManager: SerialInputOutputManager? = null
-
+    private var counter = 0
     private lateinit var locationManager : LocationManager
     private lateinit var locationListener: LocationListener
     enum class Connected {
@@ -113,6 +116,7 @@ class MainActivity : AppCompatActivity(), SerialInputOutputManager.Listener, Gan
     private lateinit var timer: MyCountDownTimer
     var oldLatitude : Double = 0.0
     var oldLongitude : Double = 0.0
+    private lateinit var sharedPreferences: SharedPreferences
     data class Coordinate(val latitude: Double, val longitude: Double)
     fun haversineDistance(start: Coordinate, end: Coordinate, radius: Double = 6371.0): Double {
         val lat1 = Math.toRadians(start.latitude)
@@ -136,7 +140,7 @@ class MainActivity : AppCompatActivity(), SerialInputOutputManager.Listener, Gan
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
+        sharedPreferences = getSharedPreferences("kalibrasi", MODE_PRIVATE)
         // Ask permissoin
         if (isLocationPermissionGranted())
         {
@@ -163,10 +167,17 @@ class MainActivity : AppCompatActivity(), SerialInputOutputManager.Listener, Gan
         // Konek port
         binding.btnConnect.setOnClickListener {
             if (connected == Connected.True) {
-                disconnect()
-
+                if (port != null) {
+                    disconnect()
+                    runningStatus = isRunning.False
+//                    stopWriting()
+                    runOnUiThread {
+                        binding.txtStatusRunning.setText("Status : Idle")
+                    }
+                }
             } else {
                 connect()
+//                startWriting()
             }
         }
         binding.btnSimpanId.setOnClickListener {
@@ -192,7 +203,7 @@ class MainActivity : AppCompatActivity(), SerialInputOutputManager.Listener, Gan
         }
 
         binding.btnStart.setOnClickListener {
-                    timer = MyCountDownTimer(txtTimer.toString().toLong() * 1000, 1000, this@MainActivity)
+            timer = MyCountDownTimer(txtTimer.toString().toLong() * 1000, 1000, this@MainActivity)
             jarak = 0.0
             timerStatus = TimingStatus.True
             timer.start()
@@ -201,6 +212,7 @@ class MainActivity : AppCompatActivity(), SerialInputOutputManager.Listener, Gan
         binding.btnStop.setOnClickListener {
             timerStatus = TimingStatus.Pending
             timer.cancel()
+
         }
 
 
@@ -209,9 +221,12 @@ class MainActivity : AppCompatActivity(), SerialInputOutputManager.Listener, Gan
             dialog.show(supportFragmentManager, "MyTimer")
         }
 
-
+        binding.btnGantiKalibrasi.setOnClickListener {
+            val dialog = KalibrasiVariableFragment()
+            dialog.show(supportFragmentManager, "MyDialogKalibrasi")
+        }
     }
-
+    private var oldLocation : Location? = null
     private fun setupLocation() {
         locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         locationListener = object : LocationListener {
@@ -222,19 +237,43 @@ class MainActivity : AppCompatActivity(), SerialInputOutputManager.Listener, Gan
                 latitude = location.latitude
                 longitude = location.longitude
                 speed = location.speed * 3.6F
-
-                if (timerStatus == TimingStatus.True) {
-                    jarak += haversineDistance(Coordinate(oldLatitude, oldLongitude), Coordinate(latitude, longitude))
-                    runOnUiThread {
-                        binding.txtJarkditempu.setText("Jarak : ${jarak * 1000} meter")
+                if (runningStatus == isRunning.True && timerStatus == TimingStatus.False) {
+                    oldLocation = location
+                } else if (runningStatus == isRunning.True && timerStatus == TimingStatus.True) {
+                    if (oldLocation == null) {
+                        oldLocation = location
+                        return
                     }
-                } else if (timerStatus == TimingStatus.Pending) {
-                    jarak += haversineDistance(Coordinate(oldLatitude, oldLongitude), Coordinate(latitude, longitude))
-                    timerStatus = TimingStatus.False
+                    jarak += oldLocation!!.distanceTo(location)
+                    oldLocation = location
                     runOnUiThread {
-                        binding.txtJarkditempu.setText("Jarak : ${jarak * 1000} meter")
+
+                        binding.txtJarkditempu.setText(String.format("%.2f", jarak) + " meter")
+                    }
+                } else if (runningStatus == isRunning.False && timerStatus == TimingStatus.Pending) {
+                    jarak += oldLocation!!.distanceTo(location)
+                    timerStatus = TimingStatus.False
+                    oldLocation = location
+                    runOnUiThread {
+                        binding.txtJarkditempu.setText(String.format("%.2f", jarak) + " meter")
                     }
                 }
+//                if (timerStatus == TimingStatus.True) {
+//                    jarak += haversineDistance(Coordinate(oldLatitude, oldLongitude), Coordinate(latitude, longitude))
+//                    runOnUiThread {
+//                        binding.txtJarkditempu.setText("Jarak : ${jarak * 1000} meter")
+//                    }
+//                } else if (timerStatus == TimingStatus.Pending) {
+////                    jarakGo = jarak + haversineDistance(Coordinate(oldLatitude, oldLongitude), Coordinate(latitude, longitude))
+//                    jarak += haversineDistance(Coordinate(oldLatitude, oldLongitude), Coordinate(latitude, longitude))
+//                    sendData()
+//                    timerStatus = TimingStatus.False
+//                    runOnUiThread {
+//                        binding.txtJarkditempu.setText("Jarak : ${jarak * 1000} meter")
+//                        binding.txtJarakGO.setText("Jarak Go : ${jarakGo * 1000} meter")
+//                        binding.txtHasil.setText("Hasil : \nJarakKalibrated: ${(jarak * 1000) + (sharedPreferences.getInt("kalibrasi", 0))} meter\nJarakGoKalibrated ${(jarakGo * 1000) + (sharedPreferences.getInt("kalibrasiGo", 0))} meter" )
+//                    }
+//                }
 
                 binding.txtLat.text = "Latitude : " + latitude.toString()
                 binding.txtLng.text = "Longitude : " + longitude.toString()
@@ -245,6 +284,11 @@ class MainActivity : AppCompatActivity(), SerialInputOutputManager.Listener, Gan
         gpsStatusListener = GPSStatusListener(locationManager, binding.txtStatusGPS)
         if (isLocationPermissionGranted()) {
             locationManager.registerGnssStatusCallback(gpsStatusListener)
+        }
+        val isAgpsEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+        if (!isAgpsEnabled) {
+            val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+            startActivity(intent)
         }
     }
 
@@ -282,7 +326,6 @@ class MainActivity : AppCompatActivity(), SerialInputOutputManager.Listener, Gan
         ) == PackageManager.PERMISSION_GRANTED
     }
     private var jarak : Double = 0.0
-
     private var timerStatus = TimingStatus.False
 
     enum class TimingStatus {
@@ -302,9 +345,6 @@ class MainActivity : AppCompatActivity(), SerialInputOutputManager.Listener, Gan
         val dialogFragment = GantiIdFragment()
         dialogFragment.show(supportFragmentManager, "MyDialogFragment")
     }
-
-
-
     override fun onResume() {
         super.onResume()
         if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
@@ -358,7 +398,6 @@ class MainActivity : AppCompatActivity(), SerialInputOutputManager.Listener, Gan
             }
             return
         }
-
         try {
             port?.open(usbConnection)
             port?.setParameters(115200,UsbSerialPort.DATABITS_8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE )
@@ -407,6 +446,13 @@ class MainActivity : AppCompatActivity(), SerialInputOutputManager.Listener, Gan
         if (serialList.size > 0) {
             if (port != null) {
                 disconnect()
+                if (runningStatus == isRunning.True) {
+                    runningStatus = isRunning.False
+                    runOnUiThread {
+                        binding.txtJarkditempu.setText("0 meter")
+                        binding.txtStatusRunning.text = "Status : Idle"
+                    }
+                }
             }
         }
         serialAdapter.notifyDataSetChanged()
@@ -415,12 +461,18 @@ class MainActivity : AppCompatActivity(), SerialInputOutputManager.Listener, Gan
 
 
     fun disconnect() {
+        try
+        {
+
         binding.btnConnect.setText("Start")
         connected = Connected.False
         port?.close()
         port = null
         if (threadWrite != null) {
             threadWrite.interrupt()
+        }
+        }catch (ex : Exception) {
+            Toast.makeText(this@MainActivity, ex.toString(), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -455,6 +507,7 @@ class MainActivity : AppCompatActivity(), SerialInputOutputManager.Listener, Gan
             )
             listLog.clear()
             if (runningStatus == isRunning.False) {
+                Thread.sleep((idPerangkat.toInt() * 500).toLong());
                 startWriting()
             }
         }
@@ -466,11 +519,10 @@ class MainActivity : AppCompatActivity(), SerialInputOutputManager.Listener, Gan
                     R.color.red
                 )
             )
-            if (runningStatus == isRunning.True) {
+            if (runningStatus == isRunning.True && timerStatus == TimingStatus.False) {
                 timerStatus = TimingStatus.True
                 runOnUiThread {
                     binding.txtStatusRunning.setText("Status : Go");
-
                 }
             }
         }
@@ -482,7 +534,7 @@ class MainActivity : AppCompatActivity(), SerialInputOutputManager.Listener, Gan
                     R.color.red
                 )
             )
-            if (runningStatus == isRunning.True) {
+            if (runningStatus == isRunning.True && (timerStatus == TimingStatus.False || timerStatus == TimingStatus.True)) {
                 stopWriting()
             }
         } else {
@@ -575,48 +627,52 @@ class MainActivity : AppCompatActivity(), SerialInputOutputManager.Listener, Gan
         jarak = 0.0
         threadWrite = Thread {
             while(runningStatus == isRunning.True) {
-                val batteryStatus= IntentFilter(Intent.ACTION_BATTERY_CHANGED).let { ifilter ->
-                    applicationContext.registerReceiver(null, ifilter)
-                }
-                val level: Int = batteryStatus?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
-                val scale: Int = batteryStatus?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
-                val batteryPct: Float = level / scale.toFloat() * 100
-                if (oldLatitudeTemp == null) {
-                    oldLatitudeTemp = latitude
-                    oldLongitudeTemp = longitude
-                    latNow = latitude
-                    lngNow = longitude
-                } else {
-                    oldLatitudeTemp = latNow
-                    oldLongitudeTemp = lngNow
-                    latNow = latitude
-                    lngNow = longitude
-                }
-                val message = "MKRRMP${idPerangkat}1222,${latitude},${longitude},${speed},${batteryPct.toInt()},*"
-                writeLine(message)
-                if ((oldLatitudeTemp != null && oldLongitudeTemp != null && latNow != null && lngNow != null) && timerStatus == TimingStatus.True) {
-                    jarakGo += haversineDistance(Coordinate(oldLatitudeTemp!!, oldLongitudeTemp!!),
-                        Coordinate(latNow!!, lngNow!!))
-                    runOnUiThread {
-                        binding.txtJarakGO.setText( "Jarak : ${jarakGo * 1000} meter")
-                    }
-                }
-                listLog.add(
-                    ListSerialItem(
-                        SimpleDateFormat("hh:mm:ss").format(Date()).toString(),
-                        message,
-                        R.color.black
-                    )
-                )
                 try {
-                    Thread.sleep(delay)
-                } catch (e: InterruptedException) {
-                    e.printStackTrace()
-                    break
+                    sendData()
+                    Thread.sleep(1000)
+                } catch (ex : Exception) {
+                    ex.printStackTrace()
+                    break;
                 }
+
             }
         }
         threadWrite.start()
+    }
+
+    private fun sendData() {
+        val batteryStatus= IntentFilter(Intent.ACTION_BATTERY_CHANGED).let { ifilter ->
+            applicationContext.registerReceiver(null, ifilter)
+        }
+        val level: Int = batteryStatus?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale: Int = batteryStatus?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+        val batteryPct: Float = level / scale.toFloat() * 100
+        if (oldLatitudeTemp == null) {
+            oldLatitudeTemp = latitude
+            oldLongitudeTemp = longitude
+            latNow = latitude
+            lngNow = longitude
+        } else {
+            oldLatitudeTemp = latNow
+            oldLongitudeTemp = lngNow
+            latNow = latitude
+            lngNow = longitude
+        }
+        val message = "MKRRMP${idPerangkat}1222,${latitude},${longitude},${speed},${batteryPct.toInt()},${jarak},*"
+//        val message = "MKRRMP${idPerangkat}1222,${latitude},${longitude},${speed},${batteryPct.toInt()},*"
+        writeLine(message)
+        listLog.add(
+            ListSerialItem(
+                SimpleDateFormat("hh:mm:ss").format(Date()).toString(),
+                message,
+                R.color.black
+            )
+        )
+        try {
+//            Thread.sleep(500)
+        } catch (e: InterruptedException) {
+            throw e
+        }
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
@@ -639,12 +695,10 @@ class MainActivity : AppCompatActivity(), SerialInputOutputManager.Listener, Gan
         val scale: Int = batteryStatus?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
         val batteryPct: Float = level / scale.toFloat() * 100
         val message = "MKRRMP${idPerangkat}1222,${latitude},${longitude},${speed},${batteryPct},*"
-        writeLine(message)
-        jarakGo += haversineDistance(Coordinate(latNow!!, lngNow!!),
-            Coordinate(latitude, longitude))
-        runOnUiThread {
-            binding.txtJarakGO.setText("Jarak : ${jarakGo * 1000} meter")
-        }
+//        writeLine(message)
+//        runOnUiThread {
+//            binding.txtJarakGO.setText("Jarak : ${jarakGo * 1000} meter")
+//        }
         serialItemList.add(
             ListSerialItem(
                 SimpleDateFormat("hh:mm:ss").format(Date()).toString(),

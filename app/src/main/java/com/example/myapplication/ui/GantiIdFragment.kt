@@ -12,11 +12,8 @@ import com.example.myapplication.R
 
 
 class GantiIdFragment : DialogFragment() {
-
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
     }
 
     override fun onCreateView(
